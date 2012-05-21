@@ -223,6 +223,7 @@ def _get_additional_capabilities():
             name = cap
             value = True
         capabilities[name] = value
+
     return capabilities
 
 
@@ -242,6 +243,8 @@ class ComputeManager(manager.SchedulerDependentManager):
         except ImportError as e:
             LOG.error(_("Unable to load the virtualization driver: %s") % (e))
             sys.exit(1)
+
+        print 'DR-----=', self.driver
 
         self.network_api = network.API()
         self.volume_api = volume.API()
@@ -297,7 +300,9 @@ class ComputeManager(manager.SchedulerDependentManager):
                 except NotImplementedError:
                     LOG.warning(_('Hypervisor driver does not support '
                                   'firewall rules'), instance=instance)
+
         self._get_instance_type_extra_specs_capabilities(context)
+        print '------ init get: ', self.extra_specs
 
     def _get_power_state(self, context, instance):
         """Retrieve the power state for the given instance."""
@@ -314,6 +319,34 @@ class ComputeManager(manager.SchedulerDependentManager):
             keyval[0] = keyval[0].strip()
             keyval[1] = keyval[1].strip()
             self.extra_specs[keyval[0]] = keyval[1]
+    
+        instances = self.db.instance_get_all_by_host(context, self.host)
+        for instance in instances:
+            instance_type_extra_specs = self.db.instance_type_extra_specs_get( \
+                context, instance.instance_type_id)
+            print 'inst ext typ=', instance_type_extra_specs
+            for key in instance_type_extra_specs:
+                op_req = instance_type_extra_specs[key]
+                print 'key=', key
+                print 'val=', op_req
+                words = op_req.split()
+                op = words[0]
+                req = words[1]
+                if op == '=':
+                    self.extra_specs[key] = str(float(self.extra_specs[key]) 
+                        - float(req))
+                if op.find('==') == 0 \
+                    or op.find('>=') == 0 or op.find('<=') == 0:
+                        print '&&&&&+-\n'
+                        if op.find('-') == 2:
+                            self.extra_specs[key] = str(float(self.extra_specs[key]) 
+                                + float(req))
+                            print 'new cap=', self.extra_specs[key]
+                        elif op.find('+') == 2:
+                            self.extra_specs[key] = str(float(self.extra_specs[key]) 
+                                - float(req))
+                            print 'new cap=', self.extra_specs[key]
+    
 
     def get_console_topic(self, context, **kwargs):
         """Retrieves the console host for a project on this host.
@@ -449,34 +482,32 @@ class ComputeManager(manager.SchedulerDependentManager):
                     context, instance, "create.start")
             network_info = self._allocate_network(context, instance,
                                                   requested_networks)
-            instances = self.db.instance_get_all_by_host(context, self.host)
-            for instance in instances:
+            try:
+                block_device_info = self._prep_block_device(context, instance)
+                instance = self._spawn(context, instance, image_meta,
+                                       network_info, block_device_info,
+                                       injected_files, admin_password)
+                # deduct resource HERE
                 instance_type_extra_specs = \
                     self.db.instance_type_extra_specs_get( \
-                    context, instance.instance_type_id)
+                        context, instance.instance_type_id)
                 for key in instance_type_extra_specs:
                     op_req = instance_type_extra_specs[key]
                     words = op_req.split()
                     op = words[0]
                     req = words[1]
                     if op == '=':
-                        self.extra_specs[key] = \
-                            str(float(self.extra_specs[key]) - float(req))
+                        self.extra_specs[key] = str(float(self.extra_specs[key]) 
+                            - float(req))
                     if op.find('==') == 0 \
                         or op.find('>=') == 0 or op.find('<=') == 0:
                             if op.find('-') == 2:
-                                self.extra_specs[key] = \
-                                    str(float(self.extra_specs[key]) \
+                                self.extra_specs[key] = str(float(self.extra_specs[key]) 
                                     + float(req))
                             elif op.find('+') == 2:
-                                self.extra_specs[key] = \
-                                    str(float(self.extra_specs[key]) \
+                                self.extra_specs[key] = str(float(self.extra_specs[key]) 
                                     - float(req))
-            try:
-                block_device_info = self._prep_block_device(context, instance)
-                instance = self._spawn(context, instance, image_meta,
-                                       network_info, block_device_info,
-                                       injected_files, admin_password)
+
             except Exception:
                 with excutils.save_and_reraise_exception():
                     self._deallocate_network(context, instance)
@@ -790,28 +821,28 @@ class ComputeManager(manager.SchedulerDependentManager):
         system_meta = self.db.instance_system_metadata_get(context,
                 instance_uuid)
         self.db.instance_destroy(context, instance_uuid)
-        for instance in instances:
-            instance_type_extra_specs = \
-                self.db.instance_type_extra_specs_get( \
+
+        # add resource HERE
+        instance_type_extra_specs = \
+            self.db.instance_type_extra_specs_get( \
                 context, instance.instance_type_id)
-            for key in instance_type_extra_specs:
-                op_req = instance_type_extra_specs[key]
-                words = op_req.split()
-                op = words[0]
-                req = words[1]
-                if op == '=':
-                    self.extra_specs[key] = \
-                        str(float(self.extra_specs[key]) - float(req))
-                if op.find('==') == 0 \
-                    or op.find('>=') == 0 or op.find('<=') == 0:
-                        if op.find('-') == 2:
-                            self.extra_specs[key] = \
-                                str(float(self.extra_specs[key]) \
-                                - float(req))
-                        elif op.find('+') == 2:
-                            self.extra_specs[key] = \
-                                str(float(self.extra_specs[key]) \
-                                + float(req))
+        for key in instance_type_extra_specs:
+            op_req = instance_type_extra_specs[key]
+            words = op_req.split()
+            op = words[0]
+            req = words[1]
+            if op == '=':
+                self.extra_specs[key] = str(float(self.extra_specs[key]) 
+                    + float(req))
+            if op.find('==') == 0 \
+                or op.find('>=') == 0 or op.find('<=') == 0:
+                    if op.find('-') == 2:
+                        self.extra_specs[key] = str(float(self.extra_specs[key]) 
+                            - float(req))
+                    elif op.find('+') == 2:
+                        self.extra_specs[key] = str(float(self.extra_specs[key]) 
+                            + float(req))
+
         self._notify_about_instance_usage(context, instance, "delete.end",
                 system_metadata=system_meta)
 
@@ -2453,11 +2484,10 @@ class ComputeManager(manager.SchedulerDependentManager):
         curr_time = time.time()
         if curr_time - self._last_host_check > FLAGS.host_state_interval:
             self._last_host_check = curr_time
-            LOG.info(_("Updating host status"))
             # This will grab info about the host and queue it
             # to be sent to the Schedulers.
             capabilities = _get_additional_capabilities()
-            capabilities.update(self.extra_specs)
+            capabilities.update(self.extra_specs)  
             capabilities.update(self.driver.get_host_stats(refresh=True))
             self.update_service_capabilities(capabilities)
 
