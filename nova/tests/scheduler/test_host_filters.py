@@ -284,6 +284,46 @@ class HostFiltersTestCase(test.TestCase):
 
         self.assertFalse(filt_cls.host_passes(host, filter_properties))
 
+    def test_compute_filter_passes_extra_specs_with_op_eq(self):
+        self._stub_service_is_up(True)
+        filt_cls = self.class_map['ComputeFilter']()
+        extra_specs = {'opt1': '= 123'}
+        capabilities = {'enabled': True, 'opt1': '123'}
+        service = {'disabled': False}
+        filter_properties = {'instance_type': {'memory_mb': 1024,
+                                               'extra_specs': extra_specs}}
+        host = fakes.FakeHostState('host1', 'compute',
+                {'free_ram_mb': 1024, 'capabilities': capabilities,
+                 'service': service})
+        self.assertTrue(filt_cls.host_passes(host, filter_properties))
+
+    def test_compute_filter_passes_extra_specs_with_op_eq2(self):
+        self._stub_service_is_up(True)
+        filt_cls = self.class_map['ComputeFilter']()
+        extra_specs = {'opt1': '= 123'}
+        capabilities = {'enabled': True, 'opt1': '124'}
+        service = {'disabled': False}
+        filter_properties = {'instance_type': {'memory_mb': 1024,
+                                               'extra_specs': extra_specs}}
+        host = fakes.FakeHostState('host1', 'compute',
+                {'free_ram_mb': 1024, 'capabilities': capabilities,
+                 'service': service})
+        self.assertTrue(filt_cls.host_passes(host, filter_properties))
+
+    def test_compute_filter_fails_extra_specs_with_op_eq(self):
+        self._stub_service_is_up(True)
+        filt_cls = self.class_map['ComputeFilter']()
+        extra_specs = {'opt2': '= 234'}
+        capabilities = {'enabled': True, 'opt2': '34'}
+        service = {'disabled': False}
+        filter_properties = {'instance_type': {'memory_mb': 1024,
+                                               'extra_specs': extra_specs}}
+        host = fakes.FakeHostState('host1', 'compute',
+                {'free_ram_mb': 1024, 'capabilities': capabilities,
+                 'service': service})
+
+        self.assertFalse(filt_cls.host_passes(host, filter_properties))
+
     def test_compute_filter_passes_extra_specs_with_op_neq(self):
         self._stub_service_is_up(True)
         filt_cls = self.class_map['ComputeFilter']()
