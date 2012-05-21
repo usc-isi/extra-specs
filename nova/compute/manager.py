@@ -244,8 +244,6 @@ class ComputeManager(manager.SchedulerDependentManager):
             LOG.error(_("Unable to load the virtualization driver: %s") % (e))
             sys.exit(1)
 
-        print 'DR-----=', self.driver
-
         self.network_api = network.API()
         self.volume_api = volume.API()
         self.network_manager = importutils.import_object(FLAGS.network_manager)
@@ -302,7 +300,6 @@ class ComputeManager(manager.SchedulerDependentManager):
                                   'firewall rules'), instance=instance)
 
         self._get_instance_type_extra_specs_capabilities(context)
-        print '------ init get: ', self.extra_specs
 
     def _get_power_state(self, context, instance):
         """Retrieve the power state for the given instance."""
@@ -324,11 +321,8 @@ class ComputeManager(manager.SchedulerDependentManager):
         for instance in instances:
             instance_type_extra_specs = self.db.instance_type_extra_specs_get( \
                 context, instance.instance_type_id)
-            print 'inst ext typ=', instance_type_extra_specs
             for key in instance_type_extra_specs:
                 op_req = instance_type_extra_specs[key]
-                print 'key=', key
-                print 'val=', op_req
                 words = op_req.split()
                 op = words[0]
                 req = words[1]
@@ -337,15 +331,12 @@ class ComputeManager(manager.SchedulerDependentManager):
                         - float(req))
                 if op.find('==') == 0 \
                     or op.find('>=') == 0 or op.find('<=') == 0:
-                        print '&&&&&+-\n'
                         if op.find('-') == 2:
                             self.extra_specs[key] = str(float(self.extra_specs[key]) 
                                 + float(req))
-                            print 'new cap=', self.extra_specs[key]
                         elif op.find('+') == 2:
                             self.extra_specs[key] = str(float(self.extra_specs[key]) 
                                 - float(req))
-                            print 'new cap=', self.extra_specs[key]
     
 
     def get_console_topic(self, context, **kwargs):
