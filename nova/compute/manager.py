@@ -2475,6 +2475,7 @@ class ComputeManager(manager.SchedulerDependentManager):
         curr_time = time.time()
         if curr_time - self._last_host_check > FLAGS.host_state_interval:
             self._last_host_check = curr_time
+            LOG.info(_("Updating host status"))
             # This will grab info about the host and queue it
             # to be sent to the Schedulers.
             capabilities = _get_additional_capabilities()
