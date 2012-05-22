@@ -164,6 +164,43 @@ class FilterSchedulerTestCase(test_scheduler.SchedulerTestCase):
         for weighted_host in weighted_hosts:
             self.assertTrue(weighted_host.host_state is not None)
 
+    def test_schedule_happy_day_with_extra_specs(self):
+        """Make sure there's nothing glaringly wrong with _schedule()
+        by doing a happy day pass through."""
+
+        self.next_weight = 1.0
+
+        def _fake_weighted_sum(functions, hosts, options):
+            self.next_weight += 2.0
+            host_state = hosts[0]
+            return least_cost.WeightedHost(self.next_weight,
+                    host_state=host_state)
+
+        sched = fakes.FakeFilterScheduler()
+        fake_context = context.RequestContext('user', 'project',
+                is_admin=True)
+
+        self.stubs.Set(sched.host_manager, 'filter_hosts',
+                fake_filter_hosts)
+        self.stubs.Set(least_cost, 'weighted_sum', _fake_weighted_sum)
+        fakes.mox_host_manager_db_calls(self.mox, fake_context)
+
+        request_spec = {'num_instances': 10,
+                        'instance_type': {'memory_mb': 512, 'root_gb': 512,
+                                          'ephemeral_gb': 0,
+                                          'vcpus': 1},
+                        'instance_properties': {'project_id': 1,
+                                                'root_gb': 512,
+                                                'memory_mb': 512,
+                                                'ephemeral_gb': 0,
+                                                'vcpus': 1}}
+        self.mox.ReplayAll()
+        weighted_hosts = sched._schedule(fake_context, 'compute',
+                request_spec)
+        self.assertEquals(len(weighted_hosts), 10)
+        for weighted_host in weighted_hosts:
+            self.assertTrue(weighted_host.host_state is not None)
+
     def test_get_cost_functions(self):
         self.flags(reserved_host_memory_mb=128)
         fixture = fakes.FakeFilterScheduler()
